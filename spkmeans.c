@@ -6,14 +6,15 @@
 double **createMatrix(int rows, int columns);
 double **initializeVectors(const char inputFile[]);
 double computeDist(double *vec1, double *vec2);
-double **WadjacencyMatrix(double **datapoints);
+double **WadjacencyMatrix(double **datapoints, int n);
 double **matrixMult(double **matrix1, double **matrix2);
 double **subMats(double **matrix1, double **matrix2);
-double **LnormMatrix(double **matrix);
+double **computeD(double **matrixW);
+double **LnormMatrix(double **matrixD);
 double calculateT(double **matrixA, int maxi, int maxj);
 void nextMatrix(double **matrixA, double c, double s, int maxi, int maxj);
 double computeOff(double **matrix);
-double **jacobi(double **matrix);
+double **jacobi(double **matrix, int n);
 double *eigenValues(double **matrixA, double **matrixV);
 int eigengapHeuristic(double **matrixA, double **matrixV);
 int cmpfunc(const void *a, const void *b);
@@ -93,11 +94,13 @@ double computeDist(double *vec1, double *vec2){
 }
 
 
-double **WadjacencyMatrix(double **datapoints){
+double **WadjacencyMatrix(double **datapoints, int n, int m){
 int i;
 int j;
 double weight;
 double **retMat;
+numOfVecs = n;
+vecLen = m;
 
 retMat = createMatrix(numOfVecs, numOfVecs);
 for(i = 0; i < numOfVecs; i++){
@@ -147,16 +150,33 @@ double **subMats(double **matrix1, double **matrix2){
     return retMat;
 }
 
-
-double **LnormMatrix(double **matrix){
-    double **I;
+double **computeD(double **matrixW, int n){
+    numOfVecs = n;
     double **D;
+    int i;
+    int j;
+
+    D = createMatrix(numOfVecs, numOfVecs);
+    for(i = 0; i < numOfVecs; i++){
+        d = 0;
+        for(j = 0 ; j < numOfVecs; j++){
+            d += matrix[i][j];
+            D[i][j] = 0;
+        }
+        D[i][i] = d;
+    }
+    return D;
+}
+
+double **LnormMatrix(double **matrixD, int n){
+    double **I;
     double **L;
     double **tmp1;
     double **tmp2; 
     int i;
     int j;
     double d;
+    numOfVecs = n;
     
     I = createMatrix(numOfVecs, numOfVecs);
     for(i = 0; i < numOfVecs; i++){
@@ -167,14 +187,8 @@ double **LnormMatrix(double **matrix){
         I[i][i] = 1;
     }
     
-    D = createMatrix(numOfVecs, numOfVecs);
     for(i = 0; i < numOfVecs; i++){
-        d = 0;
-        for(j = 0 ; j < numOfVecs; j++){
-            d += matrix[i][j];
-            D[i][j] = 0;
-        }
-        D[i][i] = 1 / (sqrt(d));
+        matrixD[i][i] = 1 / (sqrt(matrixD[i][i]));
     }
 
     tmp1 =  matrixMult(matrix, D);
@@ -183,8 +197,6 @@ double **LnormMatrix(double **matrix){
 
     free(I[0]);
     free(I);
-    free(D[0]);
-    free(D);
     free(tmp1[0]);
     free(tmp1);
     free(tmp2[0]);
@@ -257,7 +269,7 @@ double computeOff(double **matrix){
 }
 
 
-double **jacobi(double **matrix){
+double **jacobi(double **matrix, int n){
     int i;
     int j;
     double t;
@@ -271,12 +283,14 @@ double **jacobi(double **matrix){
     double EPS;
     int MAXROT;
     int contLoop;
-    int numRot = 0;
+    int numRot;
     double offA;
     double offNextA;
+    numRot = 0;
     maxi = -1;
     maxj = -1;
     contLoop = 1;
+    numOfVecs = n;
     V = createMatrix(numOfVecs, numOfVecs);
 
     for(i = 0; i < numOfVecs; i++){
