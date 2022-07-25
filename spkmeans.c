@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-// TODO: #include <kmeans.h>, create header file and fit kmeans.c file to our purposes
+#include <kmeans.h>
 
 double **createMatrix(int rows, int columns);
 double **initializeVectors(const char inputFile[]);
@@ -18,6 +18,7 @@ double *eigenValues(double **matrixA, double **matrixV);
 int eigengapHeuristic(double **matrixA, double **matrixV);
 int cmpfunc(const void *a, const void *b);
 double absVal(double d);
+double **callKmeans(int k, int size, int *initialIndices, double **vectors);
 
 int vecLen;
 int numOfVecs;
@@ -421,6 +422,9 @@ double absVal(double d){
     else return -d;
 }
 
+double **callKmeans(int k, int size, int *initialIndices, double **vectors){
+    return kMeans(k, size, initialIndices, vectors);
+}
 
 // TODO: ma shetzarich
 int main(int argc, char const *argv[])
