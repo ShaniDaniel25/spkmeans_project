@@ -510,9 +510,9 @@ double absVal(double d){
     else return -d;
 }
 
-// double **callKmeans(int k, int size, int *initialIndices, double **vectors){
-//     return kMeans(k, size, initialIndices, vectors);
-// }
+ double **callKmeans(int k, int size, int *initialIndices, double **vectors){
+     return kMeans(k, size, initialIndices, vectors);
+ }
 
 int isTXTorCSV(const char filename[]){
     int len = -1;

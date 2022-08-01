@@ -4,6 +4,7 @@
 
 void convertVectors(PyObject *pyVecs, int n, int m);
 void renormalizeMat(double **U, int n, int k);
+PyObject *centroidsToPy(double **centroids, int K);
 double **vectors;
 
 static PyObject* spk_capi(PyObject *self, PyObject *args){
@@ -87,61 +88,76 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
 }
 
 
-// static PyObject* kmeans_capi(PyObject *self, PyObject *args){
-//     PyObject *pyVectors;
-//     int K;
-//     int maxIter;
+static PyObject* kmeans_capi(PyObject *self, PyObject *args){
+    double **centroids;
+    double *initIndices;
+    PyObject *pyVectors;
+    PyObject *pyCentroids;
+    PyObject *initialIndices;
+    int K;
+    int n;
+    int i;
+    int maxIter;
+    int centIndex;
 
-//     if(!PyArg_ParseTuple(args, "iidOOii", &K, &maxIter, &epsilon, &pyVectors, &initialIndices, &vecLen, &numOfVecs)){
-//         return NULL;
-//     }
+    if(!PyArg_ParseTuple(args, "iidOOi", &K, &maxIter, &pyVectors, &initialIndices, &n)){
+        return NULL;
+    }
 
-//     convertVectors(pyVectors);
+    initIndices = calloc(K, sizeof(int));
+    for(i = 0; i < K; i++){
+        centIndex = (int) PyLong_AsLong(PySequence_GetItem(initialIndices,i));
+        initIndices[i] = centIndex;
+    }
 
-//     if(kMeans(K, maxIter) == 0){
-//         centroidsToPy(K);
-//     }
-//     free(vecList[0]);
-//     free(vecList);
-//     free(centroids[0]);
-//     free(centroids);
-//     free(sumClusters[0]);
-//     free(sumClusters);
-//     return finalCentroids;
-// }
+    convertVectors(pyVectors, n, K);
+    centroids = callKmeans(K, n, initIndices, vectors);
 
-// static PyMethodDef capiMethods[] = {
-//     {"execute_spk", // executes spk goals
-//         (PyCFunction) spk_capi,
-//         METH_VARARGS,
-//         PyDoc_STR("goals algorithm implementation")},
+    if(kMeans(K, maxIter) == 0){
+        pyCentroids = centroidsToPy(centroids, K);
+    }
 
-//         {"kmeans", // executes kmeans
-//         (PyCFunction) kmeans_capi,
-//         METH_VARARGS,
-//         PyDoc_STR("kmeans algorithm implementation")},
+    free(centroids[0]);
+    free(centroids);
+    free(vectors[0]);
+    free(vectors);
 
-//     {NULL, NULL, 0, NULL} // end, sentinel for python
-// };
+    return pyCentroids;
+}
 
-// static struct PyModuleDef moduledef = { // defining module
-//     PyModuleDef_HEAD_INIT,
-//     "spkmeansmodule",
-//     NULL,
-//     -1,
-//     capiMethods
-// };
 
-// PyMODINIT_FUNC
-// PyInit_spkmeansmodule(void)
-// {
-//     PyObject *m;
-//     m = PyModule_Create(&moduledef);
-//     if (!m) {
-//         return NULL;
-//     }
-//     return m;
-// }
+static PyMethodDef capiMethods[] = {
+    {"execute_spk", // executes spk goals
+        (PyCFunction) spk_capi,
+        METH_VARARGS,
+        PyDoc_STR("goals algorithm implementation")},
+
+        {"kmeans", // executes kmeans
+        (PyCFunction) kmeans_capi,
+        METH_VARARGS,
+        PyDoc_STR("kmeans algorithm implementation")},
+
+    {NULL, NULL, 0, NULL} // end, sentinel for python
+};
+
+static struct PyModuleDef moduledef = { // defining module
+    PyModuleDef_HEAD_INIT,
+    "spkmeansmodule",
+    NULL,
+    -1,
+    capiMethods
+};
+
+PyMODINIT_FUNC
+PyInit_spkmeansmodule(void)
+{
+    PyObject *m;
+    m = PyModule_Create(&moduledef);
+    if (!m) {
+        return NULL;
+    }
+    return m;
+}
 
 void convertVectors(PyObject *pyVecs, int n, int m){
     int i;
@@ -167,4 +183,14 @@ void renormalizeMat(double **U, int n, int k){
             U[i][j] = U[i][j] / NormRow;
         }
     }
+}
+
+PyObject *centroidsToPy(double **centroids, int K){
+    PyObject *finalCentroids;
+    int i;
+    finalCentroids = PyList_New(0);
+    for(i = 0; i < K*K; i++){
+        PyList_Append(finalCentroids, Py_BuildValue("d", centroids[0][i]));
+    }
+    return finalCentroids;
 }

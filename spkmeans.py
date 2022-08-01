@@ -20,7 +20,7 @@ def spkmeans_py(k, goal, vectors):
                 
         indices = init_centroids(T, k)
         result_centroids = spkmeans.kmeans(final_k, MAX_ITER, T, indices, n)
-        i
+        
         print(",".join(indices))
         for i in range(final_k):
             vec_buffer = []
