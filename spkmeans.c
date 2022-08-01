@@ -1,25 +1,30 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include <kmeans.h>
+#include <string.h>
+// #include <kmeans.h>
 
 double **createMatrix(int rows, int columns);
 double **initializeVectors(const char inputFile[]);
 double computeDist(double *vec1, double *vec2);
-double **WadjacencyMatrix(double **datapoints, int n);
+double **WadjacencyMatrix(double **datapoints, int n, int m);
 double **matrixMult(double **matrix1, double **matrix2);
 double **subMats(double **matrix1, double **matrix2);
-double **computeD(double **matrixW);
-double **LnormMatrix(double **matrixD);
+double **computeD(double **matrixW, int n);
+double **LnormMatrix(double **matrixW, double **matrixD, int n);
 double calculateT(double **matrixA, int maxi, int maxj);
 void nextMatrix(double **matrixA, double c, double s, int maxi, int maxj);
 double computeOff(double **matrix);
 double **jacobi(double **matrix, int n);
-double *eigenValues(double **matrixA, double **matrixV);
-int eigengapHeuristic(double **matrixA, double **matrixV);
+void eigenValues(double **matrixA, double **matrixV);
+double **outputJacobi(double **matrix, double **V, int n);
+int eigengapHeuristic(double **matrixA, double **matrixV, int n);
+double **computeU(double **matrix, double **matrixJ, int n, int k);
+int *sortedIndices(int n);
 int cmpfunc(const void *a, const void *b);
 double absVal(double d);
 double **callKmeans(int k, int size, int *initialIndices, double **vectors);
+int isTXTorCSV(const char filename[]);
 
 int vecLen;
 int numOfVecs;
@@ -153,6 +158,7 @@ double **subMats(double **matrix1, double **matrix2){
 double **computeD(double **matrixW, int n){
     numOfVecs = n;
     double **D;
+    double d;
     int i;
     int j;
 
@@ -160,7 +166,7 @@ double **computeD(double **matrixW, int n){
     for(i = 0; i < numOfVecs; i++){
         d = 0;
         for(j = 0 ; j < numOfVecs; j++){
-            d += matrix[i][j];
+            d += matrixW[i][j];
             D[i][j] = 0;
         }
         D[i][i] = d;
@@ -168,7 +174,7 @@ double **computeD(double **matrixW, int n){
     return D;
 }
 
-double **LnormMatrix(double **matrixD, int n){
+double **LnormMatrix(double **matrixW, double **matrixD, int n){
     double **I;
     double **L;
     double **tmp1;
@@ -191,8 +197,8 @@ double **LnormMatrix(double **matrixD, int n){
         matrixD[i][i] = 1 / (sqrt(matrixD[i][i]));
     }
 
-    tmp1 =  matrixMult(matrix, D);
-    tmp2 = matrixMult(D,tmp1);
+    tmp1 =  matrixMult(matrixW, matrixD);
+    tmp2 = matrixMult(matrixD ,tmp1);
     L = subMats(I, tmp2);
 
     free(I[0]);
@@ -278,6 +284,7 @@ double **jacobi(double **matrix, int n){
     double **P;
     double **V;
     double **tmp;
+    double **copyMatrix;
     int maxi;
     int maxj;
     double EPS;
@@ -292,6 +299,13 @@ double **jacobi(double **matrix, int n){
     contLoop = 1;
     numOfVecs = n;
     V = createMatrix(numOfVecs, numOfVecs);
+    copyMatrix = createMatrix(numOfVecs, numOfVecs);
+
+    for(i = 0; i < numOfVecs; i++){
+        for(j = 0; j < numOfVecs; j++){
+            copyMatrix[i][j] = matrix[i][j];
+        }
+    }
 
     for(i = 0; i < numOfVecs; i++){
             for(j = 0; j < numOfVecs; j++){
@@ -306,11 +320,11 @@ double **jacobi(double **matrix, int n){
     EPS = 0.00001;
     MAXROT = 100;
 
-    while(contLoop==1){
+    while(contLoop == 1){
         contLoop = 0;
         for(i = 0; i < numOfVecs; i++){
             for(j = i + 1; j < numOfVecs; j++){
-                if( maxj == -1 || (absVal(matrix[i][j]) > absVal(matrix[maxi][maxj]))){
+                if( maxj == -1 || (absVal(copyMatrix[i][j]) > absVal(copyMatrix[maxi][maxj]))){
                     maxi = i;
                     maxj = j;
                 }
@@ -318,13 +332,13 @@ double **jacobi(double **matrix, int n){
             }
         }
 
-        t = calculateT(matrix, maxi, maxj);
+        t = calculateT(copyMatrix, maxi, maxj);
         c = 1 / (sqrt(pow(t, 2) + 1));
         s = t * c;
 
-        offA = computeOff(matrix);
-        nextMatrix(matrix, c, s, maxi, maxj);
-        offNextA = computeOff(matrix);
+        offA = computeOff(copyMatrix);
+        nextMatrix(copyMatrix, c, s, maxi, maxj);
+        offNextA = computeOff(copyMatrix);
         
         P = createMatrix(numOfVecs, numOfVecs);
         for(i = 0; i < numOfVecs; i++){
@@ -347,7 +361,7 @@ double **jacobi(double **matrix, int n){
         free(P);
         free(V[0]);
         free(V);
-
+        
         V = tmp;
 
         numRot++;
@@ -355,20 +369,23 @@ double **jacobi(double **matrix, int n){
             contLoop = 1;
         }
     }
+    free(copyMatrix[0]);
+    free(copyMatrix);
+
     return V;
 }
 
-double *eigenValues(double **matrixA, double **matrixV){
+
+void eigenValues(double **matrixA, double **matrixV){
     int i;
     int j;
     double val;
     double **eigenMat;
     eigenMat = matrixMult(matrixA, matrixV);
 
+    eigenVals = calloc(numOfVecs, sizeof(double));
     for(i = 0; i < numOfVecs; i++){
-        eigenVals = calloc(numOfVecs, sizeof(double));
-
-        for (j = 0; i < numOfVecs; j++){
+        for (j = 0; j < numOfVecs; j++){
             if(matrixV[j][i] != 0){ 
                 val = eigenMat[j][i] / matrixV[j][i];
                 if(val != 0){
@@ -380,27 +397,44 @@ double *eigenValues(double **matrixA, double **matrixV){
     }
     free(eigenMat[0]);
     free(eigenMat);
-
-    return eigenVals;
 }
 
 
-int eigengapHeuristic(double **matrixA, double **matrixV){
+double **outputJacobi(double **matrix, double **V, int n){
+    double **res;
+    int i;
+    int j;
+    numOfVecs = n;
+
+    eigenValues(matrix, V);
+    res = createMatrix(numOfVecs + 1, numOfVecs);
+
+    for(i = 0; i < numOfVecs; i++){
+            res[0][i] = eigenVals[i];
+    }
+        
+    for (i = 1; i < numOfVecs + 1 ; i++){
+        for(j = 0; j < numOfVecs; j++){
+                res[i][j] = V[i - 1][j];
+        }
+    }
+    free(eigenVals);
+    return res;
+}
+
+
+int eigengapHeuristic(double **matrixA, double **matrixV, int n){
     int i;
     int j;
     double gap;
     double delta;
     int k;
     int *indices;
-    indices = calloc(numOfVecs, sizeof(int));
+    numOfVecs = n;
 
     eigenValues(matrixA, matrixV);
-    
-    for (i = 0; i < numOfVecs; i++){
-        indices[i] = i;
-    }
-    
-    qsort(indices, numOfVecs, sizeof(int), cmpfunc);
+
+    indices = sortedIndices(numOfVecs);
 
     gap = 0;
     k = 0;
@@ -413,8 +447,48 @@ int eigengapHeuristic(double **matrixA, double **matrixV){
     }
 
     free(indices);
+    free(eigenVals);
     return k + 1;
 }
+
+
+double **computeU(double **matrix, double **matrixJ, int n, int k){
+    int i;
+    int j;
+    int *indices;
+    double **U;
+    numOfVecs = n;
+    U = createMatrix(n, k);
+
+    eigenValues(matrix, matrixJ);
+
+    indices = sortedIndices(numOfVecs);
+
+    for(i = 0; i < numOfVecs; i++){
+        for(j = 0; j < k; j++){
+            U[i][j] = matrixJ[i][indices[j]];
+        }
+        
+    }
+    free(indices);
+    free(eigenVals);
+}
+
+
+int *sortedIndices(int n){
+    int i;
+    int *indices;
+    indices = calloc(numOfVecs, sizeof(int));
+    numOfVecs = n;
+
+    for (i = 0; i < numOfVecs; i++){
+        indices[i] = i;
+    }
+    
+    qsort(indices, numOfVecs, sizeof(int), cmpfunc);
+    return indices;
+}
+
 
 int cmpfunc(const void *a, const void *b){
     int idx1;
@@ -436,25 +510,101 @@ double absVal(double d){
     else return -d;
 }
 
-double **callKmeans(int k, int size, int *initialIndices, double **vectors){
-    return kMeans(k, size, initialIndices, vectors);
+// double **callKmeans(int k, int size, int *initialIndices, double **vectors){
+//     return kMeans(k, size, initialIndices, vectors);
+// }
+
+int isTXTorCSV(const char filename[]){
+    int len = -1;
+    int isTXT = 1;
+    int isCSV = 1;
+    for(; filename[++len] != '\0';){
+    }
+    if(len < 4){
+        return 0;
+    }
+    if(filename[len-4] != '.' || filename[len-3] != 't' || filename[len-2] != 'x' || filename[len-1] != 't'){
+        isTXT = 0;
+    }
+    if(filename[len-4] != '.' || filename[len-3] != 'c' || filename[len-2] != 's' || filename[len-1] != 'v'){
+        isCSV = 0;
+    }
+
+    if(isTXT == 1 || isCSV == 1){
+        return 1;
+    }
+    return 0;
 }
 
-// TODO: ma shetzarich
+
 int main(int argc, char const *argv[])
 {
-    double **mat = initializeVectors("input_1.txt");
-    double **adj = WadjacencyMatrix(mat);
-    double **lnorm = LnormMatrix(adj);
-    double **jac = jacobi(lnorm);
-    int k = eigengapHeuristic(lnorm, jac);
-    for(int i = 0; i < numOfVecs; i++){
-        for(int j = 0; j < numOfVecs  - 1; j++){
-            printf("%.12f, ", jac[i][j]);
-        }
-        printf("%.12f\n", jac[i][numOfVecs - 1]);
+    int n;
+    int m;
+    const char *goal;
+    const char *fileName;
+    double **datapoints;
+    double **res;
+    double **W;
+    double **D;
+    double **J;
+
+    if(argc != 3){
+        printf("Invalid Input!\n");
+        return 1;
     }
-    printf("%d", k);
+    goal = argv[1];
+    fileName = argv[2];
+
+    if(isTXTorCSV(fileName) == 0){
+        printf("Invalid Input!\n");
+        return 1;
+    }
+
+    datapoints = initializeVectors(fileName);
+    if(datapoints == NULL){
+        printf("Invalid Input!\n");
+        return 1;
+    }
+    n = numOfVecs;
+    m = numOfVecs;
+    
+    if(strcmp(goal, "wam") == 0){
+        res = WadjacencyMatrix(datapoints, numOfVecs, vecLen);
+    }
+    else if(strcmp(goal, "ddg") == 0){
+        W = WadjacencyMatrix(datapoints, numOfVecs, vecLen);
+        res = computeD(W, numOfVecs);
+        free(W[0]);
+        free(W);
+    }
+    else if(strcmp(goal, "lnorm") == 0){
+        W = WadjacencyMatrix(datapoints, numOfVecs, vecLen);
+        D = computeD(W, numOfVecs);
+        res = LnormMatrix(W, D, numOfVecs);
+        free(W[0]);
+        free(W);
+        free(D[0]);
+        free(D);
+    }
+    else if(strcmp(goal, "jacobi") == 0){
+        J = jacobi(datapoints, numOfVecs);
+        res = outputJacobi(datapoints, J, numOfVecs);
+        n = n + 1;
+        free(J[0]);
+        free(J);
+    }
+    else{
+        printf("Invalid Input!\n");
+        return 1;
+    }
+
+    for(int i = 0; i < n; i++){
+        for(int j = 0; j < m - 1; j++){
+            printf("%.4f, ", res[i][j]);
+        printf("%.4f\n", res[i][numOfVecs - 1]);
+        }
+    }
     return 0;
 }
 

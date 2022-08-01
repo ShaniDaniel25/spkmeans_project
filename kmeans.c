@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <math.h>
 
 double **kMeans(int k, int size, int *initialIndices, double **vectors);

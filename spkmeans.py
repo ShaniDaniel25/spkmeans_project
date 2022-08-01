@@ -1,16 +1,16 @@
 import sys
 import numpy as np
-import spkmeans as spkmeans
+import spkmeans
 import pandas as pd
-EPS = 0.001
+
 MAX_ITER = 300
 
 def spkmeans_py(k, goal, vectors):
-    k_zero = 1 if k == 0 else 0
+    k_zero = 1 if k == 0 else 0 
     goals = {"wam", "ddg", "lnorm", "jacobi"}
 
     if goal == "spk":
-        c_out = spkmeans.execute_spk(vectors, goal, k_zero)
+        c_out = spkmeans.execute_spk(vectors, goal, k, len(vectors), len(vectors[0])) #### do we assume vectors is not empty?
         final_k = c_out[-1] if k_zero == 1 else k
         n = (len(c_out) - 1) / final_k if k_zero== 1 else len(c_out) / final_k
         T = np.ndarray(n, final_k)
@@ -19,8 +19,8 @@ def spkmeans_py(k, goal, vectors):
                 T[i][j] = c_out[final_k * i + j]
                 
         indices = init_centroids(T, k)
-        result_centroids = spkmeans.kmeans(final_k, MAX_ITER, EPS, T, indices, n)
-        
+        result_centroids = spkmeans.kmeans(final_k, MAX_ITER, T, indices, n)
+        i
         print(",".join(indices))
         for i in range(final_k):
             vec_buffer = []
@@ -30,7 +30,7 @@ def spkmeans_py(k, goal, vectors):
             print(",".join(vec_buffer))
 
     elif goal in goals:
-        c_out = spkmeans.execute_spk(vectors, goal, 0)
+        c_out = spkmeans.execute_spk(vectors, goal, 0, len(vectors), len(vectors[0]))
         n = len(vectors)
         mat = np.ndarray(n, n)
         for i in range(n):
