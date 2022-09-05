@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 double **kMeans(int k, int size, int *initialIndices, double **vectors);
 double computeSquareDistance(double vector1[], double vector2[], int vecLen);
@@ -25,7 +26,7 @@ double **kMeans(int k, int size, int *initialIndices, double **vectors){
     sumClusters = createMatrix(k, k);
     
     if(centroids == NULL || sumClusters == NULL){
-        return 1;
+        return NULL;
     }
 
     initCentroids(vectors, initialIndices, k);
@@ -53,7 +54,7 @@ double **kMeans(int k, int size, int *initialIndices, double **vectors){
         }
         
         if (computeCentroid(sumClusters, vecCnt, k, k) == 0){
-            return 1;
+            return NULL;
         }
         
         for(i2 = 0; i2 < k; i2++){

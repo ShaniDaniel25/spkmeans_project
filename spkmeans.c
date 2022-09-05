@@ -2,9 +2,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-// #include <kmeans.h>
+#include "kmeans.h"
 
-double **createMatrix(int rows, int columns);
+double **callCreateMatrix(int rows, int columns);
 double **initializeVectors(const char inputFile[]);
 double computeDist(double *vec1, double *vec2);
 double **WadjacencyMatrix(double **datapoints, int n, int m);
@@ -31,29 +31,16 @@ int numOfVecs;
 double *eigenVals;
 
 
-double **createMatrix(int rows, int columns){
-    double *p;
-    double **a;
-    int i;
-    p = calloc(rows*columns, sizeof(double));
-    a = calloc(rows, sizeof(double *));
-    
-    for(i = 0; i < rows; i++){
-        a[i] = p + i*columns;
-    }
-    
-    return a;
+double **callCreateMatrix(int rows, int columns){
+    return createMatrix(rows, columns);
 }
 
 
 double **initializeVectors(const char inputFile[]){
-    int cols;
-    int rows;
-
     FILE *vectorsFile;
-    vectorsFile = fopen(inputFile, "r");
     double **vecList;
-
+    vectorsFile = fopen(inputFile, "r");
+    
     if(vectorsFile != NULL){
         char c;
         double d;
@@ -156,11 +143,11 @@ double **subMats(double **matrix1, double **matrix2){
 }
 
 double **computeD(double **matrixW, int n){
-    numOfVecs = n;
     double **D;
     double d;
     int i;
     int j;
+    numOfVecs = n;
 
     D = createMatrix(numOfVecs, numOfVecs);
     for(i = 0; i < numOfVecs; i++){
@@ -181,7 +168,6 @@ double **LnormMatrix(double **matrixW, double **matrixD, int n){
     double **tmp2; 
     int i;
     int j;
-    double d;
     numOfVecs = n;
     
     I = createMatrix(numOfVecs, numOfVecs);
@@ -197,7 +183,7 @@ double **LnormMatrix(double **matrixW, double **matrixD, int n){
         matrixD[i][i] = 1 / (sqrt(matrixD[i][i]));
     }
 
-    tmp1 =  matrixMult(matrixW, matrixD);
+    tmp1 = matrixMult(matrixW, matrixD);
     tmp2 = matrixMult(matrixD ,tmp1);
     L = subMats(I, tmp2);
 
@@ -408,16 +394,17 @@ double **outputJacobi(double **matrix, double **V, int n){
 
     eigenValues(matrix, V);
     res = createMatrix(numOfVecs + 1, numOfVecs);
-
-    for(i = 0; i < numOfVecs; i++){
-            res[0][i] = eigenVals[i];
-    }
         
-    for (i = 1; i < numOfVecs + 1 ; i++){
+    for (i = 0; i < numOfVecs ; i++){
         for(j = 0; j < numOfVecs; j++){
                 res[i][j] = V[i - 1][j];
         }
     }
+
+     for(i = numOfVecs; i < numOfVecs + 1; i++){
+            res[0][i] = eigenVals[i];
+    }
+
     free(eigenVals);
     return res;
 }
@@ -425,7 +412,6 @@ double **outputJacobi(double **matrix, double **V, int n){
 
 int eigengapHeuristic(double **matrixA, double **matrixV, int n){
     int i;
-    int j;
     double gap;
     double delta;
     int k;
@@ -472,6 +458,8 @@ double **computeU(double **matrix, double **matrixJ, int n, int k){
     }
     free(indices);
     free(eigenVals);
+
+    return U;
 }
 
 
@@ -541,6 +529,8 @@ int main(int argc, char const *argv[])
 {
     int n;
     int m;
+    int i;
+    int j;
     const char *goal;
     const char *fileName;
     double **datapoints;
@@ -599,8 +589,8 @@ int main(int argc, char const *argv[])
         return 1;
     }
 
-    for(int i = 0; i < n; i++){
-        for(int j = 0; j < m - 1; j++){
+    for(i = 0; i < n; i++){
+        for(j = 0; j < m - 1; j++){
             printf("%.4f, ", res[i][j]);
         printf("%.4f\n", res[i][numOfVecs - 1]);
         }

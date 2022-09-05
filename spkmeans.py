@@ -6,17 +6,16 @@ import pandas as pd
 MAX_ITER = 300
 
 def spkmeans_py(k, goal, vectors):
-    k_zero = 1 if k == 0 else 0 
     goals = {"wam", "ddg", "lnorm", "jacobi"}
 
     if goal == "spk":
         c_out = spkmeans.execute_spk(vectors, goal, k, len(vectors), len(vectors[0])) #### do we assume vectors is not empty?
-        final_k = c_out[-1] if k_zero == 1 else k
-        n = (len(c_out) - 1) / final_k if k_zero== 1 else len(c_out) / final_k
+        final_k = c_out[0]
+        n = len(vectors)
         T = np.ndarray(n, final_k)
         for i in range(n):
             for j in range(final_k):
-                T[i][j] = c_out[final_k * i + j]
+                T[i][j] = c_out[final_k * i + j + 1]
                 
         indices = init_centroids(T, k)
         result_centroids = spkmeans.kmeans(final_k, MAX_ITER, T, indices, n)

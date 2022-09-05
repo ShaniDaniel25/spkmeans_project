@@ -1,18 +1,21 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <math.h>
+#include "spkmeans.h"
 
 void convertVectors(PyObject *pyVecs, int n, int m);
 void renormalizeMat(double **U, int n, int k);
-PyObject *centroidsToPy(double **centroids, int K);
+PyObject *cMatToPy(double **centroids, int n, int m);
 double **vectors;
 
 static PyObject* spk_capi(PyObject *self, PyObject *args){
     PyObject *pyVectors;
+    PyObject *pyResMat;
     int goal;
     int k;
     int n;
     int m;
+    int i;
     double **W;
     double **D;
     double **L;
@@ -40,7 +43,17 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
 
         U = computeU(L, J, n, k);
         renormalizeMat(U, n, k);
-        resMat = U;
+        
+        resMat = callCreateMatrix(1, n*k + 1);
+        resMat[0][0] = k;
+
+        for(i = 1; i < n*k + 1; i++){
+            resMat[0][i] = U[0][i-1];
+        }
+
+        pyResMat = cMatToPy(resMat, 1, n*k + 1);
+        free(resMat[0]);
+        free(resMat);
         free(W[0]);
         free(W);
         free(D[0]);
@@ -49,34 +62,49 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
         free(L);
         free(J[0]);
         free(J);
+        free(U[0]);
+        free(U);
+
         break;
 
     case 1: //wam
         resMat = WadjacencyMatrix(vectors, n, m);
+        pyResMat  = cMatToPy(resMat, n, n);
+        free(resMat[0]);
+        free(resMat);
         break;
 
     case 2: //ddg
         W = WadjacencyMatrix(vectors, n, m);
         resMat = computeD(W, n);
+        pyResMat  = cMatToPy(resMat, n, n);
         free(W[0]);
         free(W);
+        free(resMat[0]);
+        free(resMat);
         break;
 
     case 3: //lnorm
         W = WadjacencyMatrix(vectors, n, m);
         D = computeD(W, n);
         resMat = LnormMatrix(W, D, n);
+        pyResMat  = cMatToPy(resMat, n, n);
         free(W[0]);
         free(W);
         free(D[0]);
         free(D);
+        free(resMat[0]);
+        free(resMat);
         break;
 
     case 4: //jacobi
         J = jacobi(vectors, n);
         resMat = outputJacobi(vectors, J, n);
+        pyResMat  = cMatToPy(resMat, n+1, n);
         free(J[0]);
         free(J);
+        free(resMat[0]);
+        free(resMat);
         break;
     default:
         break;
@@ -84,7 +112,7 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
 
     free(vectors[0]);
     free(vectors);
-    return resMat;
+    return pyResMat;
 }
 
 
@@ -111,10 +139,9 @@ static PyObject* kmeans_capi(PyObject *self, PyObject *args){
     }
 
     convertVectors(pyVectors, n, K);
-    centroids = callKmeans(K, n, initIndices, vectors);
 
-    if(kMeans(K, maxIter) == 0){
-        pyCentroids = centroidsToPy(centroids, K);
+    if((centroids = callKmeans(K, n, initIndices, vectors)) != NULL){
+        pyCentroids = cMatToPy(centroids, K, K);
     }
 
     free(centroids[0]);
@@ -132,7 +159,7 @@ static PyMethodDef capiMethods[] = {
         METH_VARARGS,
         PyDoc_STR("goals algorithm implementation")},
 
-        {"kmeans", // executes kmeans
+    {"kmeans", // executes kmeans
         (PyCFunction) kmeans_capi,
         METH_VARARGS,
         PyDoc_STR("kmeans algorithm implementation")},
@@ -161,7 +188,7 @@ PyInit_spkmeansmodule(void)
 
 void convertVectors(PyObject *pyVecs, int n, int m){
     int i;
-    vectors = createMatrix(n, m);
+    vectors = callCreateMatrix(n, m);
     for(i = 0; i < n*m; i++){
         vectors[0][i] = PyFloat_AsDouble(PySequence_GetItem(pyVecs, i));
     }
@@ -185,11 +212,11 @@ void renormalizeMat(double **U, int n, int k){
     }
 }
 
-PyObject *centroidsToPy(double **centroids, int K){
+PyObject *cMatToPy(double **centroids, int n, int m){
     PyObject *finalCentroids;
     int i;
     finalCentroids = PyList_New(0);
-    for(i = 0; i < K*K; i++){
+    for(i = 0; i < n*m; i++){
         PyList_Append(finalCentroids, Py_BuildValue("d", centroids[0][i]));
     }
     return finalCentroids;
