@@ -17,13 +17,12 @@ setup(name = 'spkmeans',
     ],
     ext_modules = [
         Extension(
-            'execute_spk',
-            ['spkmeansmodule.c']
-        ),
-        
-        Extension(
-            'kmeans',
-            ['spkmeansmodule.c']
+            'spkmeans',
+            ['spkmeansmodule.c',
+             'spkmeans.c',
+             'kmeans.c'
+             ],
+            
         )
     ]
 )

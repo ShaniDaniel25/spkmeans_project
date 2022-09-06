@@ -3,14 +3,16 @@
 #include <math.h>
 #include "spkmeans.h"
 
+
 void convertVectors(PyObject *pyVecs, int n, int m);
 void renormalizeMat(double **U, int n, int k);
-PyObject *cMatToPy(double **centroids, int n, int m);
+void cMatToPy(double **vecs, int n, int m);
 double **vectors;
+PyObject *pyResMat;
 
 static PyObject* spk_capi(PyObject *self, PyObject *args){
     PyObject *pyVectors;
-    PyObject *pyResMat;
+    PyObject *initialIndices;
     int goal;
     int k;
     int n;
@@ -22,8 +24,11 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
     double **J;
     double **U;
     double **resMat;
+    double **centroids;
+    int *initIndices;
+    int centIndex;
 
-    if(!PyArg_ParseTuple(args, "Oiiii", &pyVectors, &goal, &k, &n, &m)){
+    if(!PyArg_ParseTuple(args, "OiiiiO", &pyVectors, &goal, &k, &n, &m, &initialIndices)){
         return NULL;
     }
 
@@ -51,7 +56,7 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
             resMat[0][i] = U[0][i-1];
         }
 
-        pyResMat = cMatToPy(resMat, 1, n*k + 1);
+        cMatToPy(resMat, 1, n*k + 1);
         free(resMat[0]);
         free(resMat);
         free(W[0]);
@@ -69,7 +74,7 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
 
     case 1: //wam
         resMat = WadjacencyMatrix(vectors, n, m);
-        pyResMat  = cMatToPy(resMat, n, n);
+        cMatToPy(resMat, n, n);
         free(resMat[0]);
         free(resMat);
         break;
@@ -77,7 +82,7 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
     case 2: //ddg
         W = WadjacencyMatrix(vectors, n, m);
         resMat = computeD(W, n);
-        pyResMat  = cMatToPy(resMat, n, n);
+        cMatToPy(resMat, n, n);
         free(W[0]);
         free(W);
         free(resMat[0]);
@@ -88,7 +93,7 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
         W = WadjacencyMatrix(vectors, n, m);
         D = computeD(W, n);
         resMat = LnormMatrix(W, D, n);
-        pyResMat  = cMatToPy(resMat, n, n);
+        cMatToPy(resMat, n, n);
         free(W[0]);
         free(W);
         free(D[0]);
@@ -100,12 +105,28 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
     case 4: //jacobi
         J = jacobi(vectors, n);
         resMat = outputJacobi(vectors, J, n);
-        pyResMat  = cMatToPy(resMat, n+1, n);
+        cMatToPy(resMat, n+1, n);
         free(J[0]);
         free(J);
         free(resMat[0]);
         free(resMat);
         break;
+
+    case 5:
+        initIndices = calloc(k, sizeof(int));
+        for(i = 0; i < k; i++){
+            centIndex = (int) PyLong_AsLong(PySequence_GetItem(initialIndices,i));
+            initIndices[i] = centIndex;
+        }
+
+        if((centroids = callKmeans(k, n, initIndices, vectors)) != NULL){
+            cMatToPy(centroids, k, k);
+        }
+
+        free(centroids[0]);
+        free(centroids);
+        free(initIndices);
+
     default:
         break;
     }
@@ -116,67 +137,24 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
 }
 
 
-static PyObject* kmeans_capi(PyObject *self, PyObject *args){
-    double **centroids;
-    double *initIndices;
-    PyObject *pyVectors;
-    PyObject *pyCentroids;
-    PyObject *initialIndices;
-    int K;
-    int n;
-    int i;
-    int maxIter;
-    int centIndex;
-
-    if(!PyArg_ParseTuple(args, "iidOOi", &K, &maxIter, &pyVectors, &initialIndices, &n)){
-        return NULL;
-    }
-
-    initIndices = calloc(K, sizeof(int));
-    for(i = 0; i < K; i++){
-        centIndex = (int) PyLong_AsLong(PySequence_GetItem(initialIndices,i));
-        initIndices[i] = centIndex;
-    }
-
-    convertVectors(pyVectors, n, K);
-
-    if((centroids = callKmeans(K, n, initIndices, vectors)) != NULL){
-        pyCentroids = cMatToPy(centroids, K, K);
-    }
-
-    free(centroids[0]);
-    free(centroids);
-    free(vectors[0]);
-    free(vectors);
-
-    return pyCentroids;
-}
-
-
 static PyMethodDef capiMethods[] = {
-    {"execute_spk", // executes spk goals
+    {"execute_spk", // python function's name
         (PyCFunction) spk_capi,
         METH_VARARGS,
-        PyDoc_STR("goals algorithm implementation")},
-
-    {"kmeans", // executes kmeans
-        (PyCFunction) kmeans_capi,
-        METH_VARARGS,
-        PyDoc_STR("kmeans algorithm implementation")},
-
+        PyDoc_STR("skmeans algorithm implementation")},
     {NULL, NULL, 0, NULL} // end, sentinel for python
 };
 
 static struct PyModuleDef moduledef = { // defining module
     PyModuleDef_HEAD_INIT,
-    "spkmeansmodule",
+    "spkmeans",
     NULL,
     -1,
     capiMethods
 };
 
 PyMODINIT_FUNC
-PyInit_spkmeansmodule(void)
+PyInit_spkmeans(void)
 {
     PyObject *m;
     m = PyModule_Create(&moduledef);
@@ -207,17 +185,21 @@ void renormalizeMat(double **U, int n, int k){
         NormRow = sqrt(NormRow);
 
         for(j = 0; j < k; j++){
-            U[i][j] = U[i][j] / NormRow;
+            if(NormRow == 0){
+                U[i][j] = 0;
+            }
+
+            else{
+                U[i][j] = U[i][j] / NormRow;
+            }
         }
     }
 }
 
-PyObject *cMatToPy(double **centroids, int n, int m){
-    PyObject *finalCentroids;
+void cMatToPy(double **vecs, int n, int m){ 
     int i;
-    finalCentroids = PyList_New(0);
+    pyResMat = PyList_New(0);
     for(i = 0; i < n*m; i++){
-        PyList_Append(finalCentroids, Py_BuildValue("d", centroids[0][i]));
+        PyList_Append(pyResMat, Py_BuildValue("d", vecs[0][i]));
     }
-    return finalCentroids;
 }

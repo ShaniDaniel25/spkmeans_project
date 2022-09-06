@@ -71,6 +71,10 @@ double **initializeVectors(const char inputFile[]){
         }
         fclose(vectorsFile);  
     }
+
+    else{
+        vecList = NULL;
+    }
     return vecList;
 }
 
@@ -345,10 +349,15 @@ double **jacobi(double **matrix, int n){
 
         free(P[0]);
         free(P);
-        free(V[0]);
-        free(V);
         
-        V = tmp;
+        for(i = 0; i < numOfVecs; i++){
+            for(j = 0; j < numOfVecs; j++){
+                V[i][j] = tmp[i][j];
+            }
+        }
+
+        free(tmp[0]);
+        free(tmp);
 
         numRot++;
         if((offA - offNextA > EPS) && (numRot < MAXROT)){
@@ -397,12 +406,12 @@ double **outputJacobi(double **matrix, double **V, int n){
         
     for (i = 0; i < numOfVecs ; i++){
         for(j = 0; j < numOfVecs; j++){
-                res[i][j] = V[i - 1][j];
+                res[i][j] = V[i][j];
         }
     }
 
-     for(i = numOfVecs; i < numOfVecs + 1; i++){
-            res[0][i] = eigenVals[i];
+     for(i = 0; i < numOfVecs; i++){
+            res[numOfVecs][i] = eigenVals[i];
     }
 
     free(eigenVals);
@@ -580,9 +589,12 @@ int main(int argc, char const *argv[])
     else if(strcmp(goal, "jacobi") == 0){
         J = jacobi(datapoints, numOfVecs);
         res = outputJacobi(datapoints, J, numOfVecs);
-        n = n + 1;
         free(J[0]);
         free(J);
+        for(i = 0; i < numOfVecs - 1; i++){
+          printf("%.4f,", res[numOfVecs][i]);   
+        }
+        printf("%.4f\n", res[numOfVecs][numOfVecs - 1]);
     }
     else{
         printf("Invalid Input!\n");
@@ -591,10 +603,9 @@ int main(int argc, char const *argv[])
 
     for(i = 0; i < n; i++){
         for(j = 0; j < m - 1; j++){
-            printf("%.4f, ", res[i][j]);
-        printf("%.4f\n", res[i][numOfVecs - 1]);
+            printf("%.4f,", res[i][j]);
         }
+        printf("%.4f\n", res[i][m - 1]);
     }
     return 0;
 }
-

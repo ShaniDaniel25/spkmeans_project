@@ -2,25 +2,31 @@ import sys
 import numpy as np
 import spkmeans
 import pandas as pd
+import traceback
 
 MAX_ITER = 300
 
 def spkmeans_py(k, goal, vectors):
-    goals = {"wam", "ddg", "lnorm", "jacobi"}
+    goals = {"wam": 1, "ddg": 2, "lnorm": 3, "jacobi": 4}
 
     if goal == "spk":
-        c_out = spkmeans.execute_spk(vectors, goal, k, len(vectors), len(vectors[0])) #### do we assume vectors is not empty?
-        final_k = c_out[0]
+        c_out = spkmeans.execute_spk(vectors.flatten(), 0, k, len(vectors), len(vectors[0]), [])
+        final_k = int(c_out[0])
         n = len(vectors)
-        T = np.ndarray(n, final_k)
+        T = np.ndarray((n, final_k))
         for i in range(n):
             for j in range(final_k):
                 T[i][j] = c_out[final_k * i + j + 1]
+        
+        print(c_out)
+        print(T)
                 
         indices = init_centroids(T, k)
-        result_centroids = spkmeans.kmeans(final_k, MAX_ITER, T, indices, n)
+        result_centroids = spkmeans.execute_spk(T.flatten(), 5, final_k, n, final_k, indices)
         
-        print(",".join(indices))
+        str_idx = [str(idx) for idx in indices]
+        print(",".join(str_idx))
+        
         for i in range(final_k):
             vec_buffer = []
             for j in range(final_k):
@@ -29,24 +35,24 @@ def spkmeans_py(k, goal, vectors):
             print(",".join(vec_buffer))
 
     elif goal in goals:
-        c_out = spkmeans.execute_spk(vectors, goal, 0, len(vectors), len(vectors[0]))
+        c_out = spkmeans.execute_spk(vectors.flatten(), goals[goal], 0, len(vectors), len(vectors[0]), [])
         n = len(vectors)
-        mat = np.ndarray(n, n)
+        mat = np.ndarray((n, n))
         for i in range(n):
             for j in range(n):
-                mat[i][j] = c_out[n * 1 + j]
+                mat[i][j] = c_out[n * i + j]
         
         if goal == 'jacobi':
             eigen_vals = []
             for i in range(n):
-                eigen_vals.append(c_out[n*n + i])
+                eigen_vals.append("%.4f" % c_out[n*n + i])
             print(",".join(eigen_vals))
             
         for i in range(n):
             vec_buffer = []
             for j in range(n):
-                to_append = ("%.4f" % mat[n * i + j])
-                vec_buffer.append(to_append)
+                to_append = np.float32(mat[i][j])
+                vec_buffer.append("%.4f" % to_append)
             print(",".join(vec_buffer))
         
     else:
@@ -56,7 +62,7 @@ def spkmeans_py(k, goal, vectors):
 def init_centroids(vectors, k):
     np.random.seed(0)
     N, M = vectors.shape
-    assert 0 < k < N
+    assert 0 <= k < N
 
     indices = [i for i in range(N)]
     ind_array = np.array(indices)
@@ -91,7 +97,6 @@ def init_centroids(vectors, k):
 def init_vecs(file_name):
     vectors = pd.read_csv(file_name, header=None)
     vectors = vectors.to_numpy(dtype=float)
-    vectors = vectors[vectors[:, 0].argsort()][:, 1:]
     return vectors
 
 
@@ -111,12 +116,12 @@ def main(args):
         vectors = init_vecs(file_name)
         spkmeans_py(k, goal, vectors)
         
-        
     except AssertionError:
         print("Invalid Input!")
         return
     
     except Exception:
+        traceback.print_exc()
         print("An Error Has Occurred")
         return
 
