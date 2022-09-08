@@ -17,11 +17,8 @@ def spkmeans_py(k, goal, vectors):
         for i in range(n):
             for j in range(final_k):
                 T[i][j] = c_out[final_k * i + j + 1]
-        
-        print(c_out)
-        print(T)
                 
-        indices = init_centroids(T, k)
+        indices = init_centroids(T, final_k)
         result_centroids = spkmeans.execute_spk(T.flatten(), 5, final_k, n, final_k, indices)
         
         str_idx = [str(idx) for idx in indices]

@@ -18,13 +18,16 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
     int n;
     int m;
     int i;
+    int j;
     double **W;
     double **D;
     double **L;
-    double **J;
+    double **JEig;
     double **U;
     double **resMat;
+    double **J;
     double **centroids;
+    double *eigenVals;
     int *initIndices;
     int centIndex;
 
@@ -40,15 +43,29 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
         W = WadjacencyMatrix(vectors, n, m);
         D = computeD(W, n);
         L = LnormMatrix(W, D, n);
-        J = jacobi(L, n);
-        
-        if(k == 0){
-            k = eigengapHeuristic(L, J, n);
+        JEig = jacobi(L, n);
+
+        J = callCreateMatrix(n, n);
+        for(i = 0; i < n; i++){
+            for(j = 0; j < n; j ++){
+                J[i][j] = JEig[i][j];
+            }
         }
 
-        U = computeU(L, J, n, k);
-        renormalizeMat(U, n, k);
+        eigenVals = calloc(n, sizeof(double));
+        for(i = 0; i < n; i++){
+            eigenVals[i] = JEig[n][i];
+        }
+
         
+        if(k == 0){
+            k = eigengapHeuristic(eigenVals, n);
+        }
+
+
+        U = computeU(J, eigenVals, n, k);
+        renormalizeMat(U, n, k);
+
         resMat = callCreateMatrix(1, n*k + 1);
         resMat[0][0] = k;
 
@@ -69,6 +86,9 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
         free(J);
         free(U[0]);
         free(U);
+        free(JEig[0]);
+        free(JEig);
+        free(eigenVals);
 
         break;
 
@@ -103,11 +123,8 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
         break;
 
     case 4: //jacobi
-        J = jacobi(vectors, n);
-        resMat = outputJacobi(vectors, J, n);
+        resMat = jacobi(vectors, n);
         cMatToPy(resMat, n+1, n);
-        free(J[0]);
-        free(J);
         free(resMat[0]);
         free(resMat);
         break;
@@ -126,6 +143,7 @@ static PyObject* spk_capi(PyObject *self, PyObject *args){
         free(centroids[0]);
         free(centroids);
         free(initIndices);
+        break;
 
     default:
         break;

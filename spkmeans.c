@@ -16,10 +16,8 @@ double calculateT(double **matrixA, int maxi, int maxj);
 void nextMatrix(double **matrixA, double c, double s, int maxi, int maxj);
 double computeOff(double **matrix);
 double **jacobi(double **matrix, int n);
-void eigenValues(double **matrixA, double **matrixV);
-double **outputJacobi(double **matrix, double **V, int n);
-int eigengapHeuristic(double **matrixA, double **matrixV, int n);
-double **computeU(double **matrix, double **matrixJ, int n, int k);
+int eigengapHeuristic(double *eigVals, int n);
+double **computeU(double **matrixJ, double *eigVals, int n, int k);
 int *sortedIndices(int n);
 int cmpfunc(const void *a, const void *b);
 double absVal(double d);
@@ -275,6 +273,7 @@ double **jacobi(double **matrix, int n){
     double **V;
     double **tmp;
     double **copyMatrix;
+    double **resMat;
     int maxi;
     int maxj;
     double EPS;
@@ -309,6 +308,11 @@ double **jacobi(double **matrix, int n){
 
     EPS = 0.00001;
     MAXROT = 100;
+
+    offA = computeOff(copyMatrix);
+    if(offA == 0){
+        contLoop = 0;
+    }
 
     while(contLoop == 1){
         contLoop = 0;
@@ -364,62 +368,36 @@ double **jacobi(double **matrix, int n){
             contLoop = 1;
         }
     }
-    free(copyMatrix[0]);
-    free(copyMatrix);
-
-    return V;
-}
-
-
-void eigenValues(double **matrixA, double **matrixV){
-    int i;
-    int j;
-    double val;
-    double **eigenMat;
-    eigenMat = matrixMult(matrixA, matrixV);
 
     eigenVals = calloc(numOfVecs, sizeof(double));
     for(i = 0; i < numOfVecs; i++){
-        for (j = 0; j < numOfVecs; j++){
-            if(matrixV[j][i] != 0){ 
-                val = eigenMat[j][i] / matrixV[j][i];
-                if(val != 0){
-                    eigenVals[i] = val;
-                    break;
-                }
-            }
-        }
+        eigenVals[i] = copyMatrix[i][i];
     }
-    free(eigenMat[0]);
-    free(eigenMat);
-}
 
+    free(copyMatrix[0]);
+    free(copyMatrix);
 
-double **outputJacobi(double **matrix, double **V, int n){
-    double **res;
-    int i;
-    int j;
-    numOfVecs = n;
+    resMat = createMatrix(n+1, n);
 
-    eigenValues(matrix, V);
-    res = createMatrix(numOfVecs + 1, numOfVecs);
-        
-    for (i = 0; i < numOfVecs ; i++){
-        for(j = 0; j < numOfVecs; j++){
-                res[i][j] = V[i][j];
+    for(i = 0; i < n; i++){
+        resMat[n][i] = eigenVals[i];
+    }
+
+    for(i = 0; i < n; i ++){
+        for(j = 0; j < n; j++){
+            resMat[i][j] = V[i][j];
         }
     }
 
-     for(i = 0; i < numOfVecs; i++){
-            res[numOfVecs][i] = eigenVals[i];
-    }
-
+    free(V[0]);
+    free(V);
     free(eigenVals);
-    return res;
+
+    return resMat;
 }
 
 
-int eigengapHeuristic(double **matrixA, double **matrixV, int n){
+int eigengapHeuristic(double *eigVals, int n){
     int i;
     double gap;
     double delta;
@@ -427,13 +405,16 @@ int eigengapHeuristic(double **matrixA, double **matrixV, int n){
     int *indices;
     numOfVecs = n;
 
-    eigenValues(matrixA, matrixV);
+    eigenVals = calloc(numOfVecs, sizeof(double));
+    for(i = 0; i < n; i++){
+        eigenVals[i] = eigVals[i];
+    }
 
     indices = sortedIndices(numOfVecs);
-
     gap = 0;
     k = 0;
-    for (i = 0; i < numOfVecs/2 ; i++){
+
+    for (i = 0; i < n/2 ; i++){
         delta = eigenVals[indices[i]] - eigenVals[indices[i+1]];
         if(delta > gap){
             gap = delta;
@@ -447,7 +428,7 @@ int eigengapHeuristic(double **matrixA, double **matrixV, int n){
 }
 
 
-double **computeU(double **matrix, double **matrixJ, int n, int k){
+double **computeU(double **matrixJ, double *eigVals, int n, int k){
     int i;
     int j;
     int *indices;
@@ -455,16 +436,19 @@ double **computeU(double **matrix, double **matrixJ, int n, int k){
     numOfVecs = n;
     U = createMatrix(n, k);
 
-    eigenValues(matrix, matrixJ);
+    eigenVals = calloc(numOfVecs, sizeof(double));
+    for(i = 0; i < n; i++){
+        eigenVals[i] = eigVals[i];
+    }
 
     indices = sortedIndices(numOfVecs);
 
-    for(i = 0; i < numOfVecs; i++){
+    for(i = 0; i < n; i++){
         for(j = 0; j < k; j++){
             U[i][j] = matrixJ[i][indices[j]];
-        }
-        
+        }    
     }
+
     free(indices);
     free(eigenVals);
 
@@ -475,8 +459,8 @@ double **computeU(double **matrix, double **matrixJ, int n, int k){
 int *sortedIndices(int n){
     int i;
     int *indices;
-    indices = calloc(numOfVecs, sizeof(int));
     numOfVecs = n;
+    indices = calloc(numOfVecs, sizeof(int));
 
     for (i = 0; i < numOfVecs; i++){
         indices[i] = i;
@@ -546,7 +530,6 @@ int main(int argc, char const *argv[])
     double **res;
     double **W;
     double **D;
-    double **J;
 
     if(argc != 3){
         printf("Invalid Input!\n");
@@ -587,16 +570,17 @@ int main(int argc, char const *argv[])
         free(D);
     }
     else if(strcmp(goal, "jacobi") == 0){
-        J = jacobi(datapoints, numOfVecs);
-        res = outputJacobi(datapoints, J, numOfVecs);
-        free(J[0]);
-        free(J);
+        res = jacobi(datapoints, numOfVecs);
+
         for(i = 0; i < numOfVecs - 1; i++){
           printf("%.4f,", res[numOfVecs][i]);   
         }
         printf("%.4f\n", res[numOfVecs][numOfVecs - 1]);
     }
+    
     else{
+        free(datapoints[0]);
+        free(datapoints);
         printf("Invalid Input!\n");
         return 1;
     }
@@ -607,5 +591,10 @@ int main(int argc, char const *argv[])
         }
         printf("%.4f\n", res[i][m - 1]);
     }
+
+    free(datapoints[0]);
+    free(datapoints);
+    free(res[0]);
+    free(res);
     return 0;
 }
