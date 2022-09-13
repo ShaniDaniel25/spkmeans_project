@@ -17,3 +17,4 @@ The project should evetually include the following files:
 
 * additional files - such as kmeans.c and kmeans.h so we can use kmeans.
 
+They said it will be a python project with just a little c backend, so they said.  
