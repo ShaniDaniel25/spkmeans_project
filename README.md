@@ -1,7 +1,7 @@
 # spkmeans project
 Final software project - spkmeans.
 
-The project should evetually include the following files:
+The project includes the following files:
 
 * spkmeans.py -  python interface, includes the execution of the program.
 
@@ -13,8 +13,7 @@ The project should evetually include the following files:
 
 * setup.py - setup file.
 
-* comp.sh - compilation script, we need to figure it out.
+* comp.sh - compilation script
 
-* additional files - such as kmeans.c and kmeans.h so we can use kmeans.
+* additional files - kmeans.c and kmeans.h for kmeans algorithm.
 
-They said it will be a python project with just a little c backend, so they said.  
